@@ -30,7 +30,7 @@ fn main() {
     // At this point "game" variable is populated with initial map data.
     // This is a good place to do computationally expensive start-up pre-processing.
     // As soon as you call "ready" function below, the 2 second per turn timer will start.
-    Game::ready("MyRustBot");
+    Game::ready("Overlord");
 
     Log::log(&format!("Successfully created bot! My Player ID is {}. Bot rng seed is {}.", game.my_id.0, rng_seed));
 
@@ -55,7 +55,7 @@ fn main() {
                 ship.stay_still()
             } else {
                 let mut possible_positions = ship.position.get_surrounding_cardinals();
-                possible_positions.sort_by(|position_a, position_b| map.at_position(position_a).halite.cmp(&map.at_position(position_b).halite));
+                possible_positions.sort_by(|position_a, position_b| map.at_position(position_b).halite.cmp(&map.at_position(position_a).halite));
                 let best_position = possible_positions.iter().find(|position| navi.is_safe(position));
                 Log::log(&format!("Number of possible_positions: {}", possible_positions.len()));
                 match best_position {
