@@ -6,16 +6,12 @@ use hlt::command::Command;
 use hlt::game::Game;
 use hlt::log::Log;
 use hlt::navi::Navi;
+use hlt::position::Position;
 use std::env;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 mod hlt;
-
-/**
-fn naive_navigate(&mut self, ship: &Ship, destination: &Position) -> Direction {
-}
-*/
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -42,28 +38,37 @@ fn main() {
         let map = &mut game.map;
 
         let mut command_queue: Vec<Command> = Vec::new();
+        let mut future_positions: Vec<Position> = Vec::new();
 
         for ship_id in &me.ship_ids {
             let ship = &game.ships[ship_id];
             let cell = map.at_entity(ship);
 
+            Log::log(&format!("For ship in: {}, {}", ship.position.x, ship.position.y));
             let command = if ship.halite > 900 {
-                let shipyard_direction = navi.naive_navigate(ship, &me.shipyard.position);
-                // maybe mark unsafe cell here
+                let shipyard_direction = navi.better_navigate(ship, &me.shipyard.position, &me.ship_ids, &future_positions);
+                let future_position = ship.position.directional_offset(shipyard_direction);
+                future_positions.push(future_position);
+                Log::log("Move towards shipyard");
                 ship.move_ship(shipyard_direction)
             } else if cell.halite > 0  {
+                Log::log(&format!("Stay still: {}", cell.halite));
                 ship.stay_still()
             } else {
                 let mut possible_positions = ship.position.get_surrounding_cardinals();
                 possible_positions.sort_by(|position_a, position_b| map.at_position(position_b).halite.cmp(&map.at_position(position_a).halite));
-                let best_position = possible_positions.iter().find(|position| navi.is_safe(position));
+                let best_position = possible_positions.iter().find(|position| navi.is_smart_safe(position, &me.ship_ids, &future_positions));
                 Log::log(&format!("Number of possible_positions: {}", possible_positions.len()));
                 match best_position {
                   Some(position) => {
                     Log::log(&format!("Best position: {}, {}", position.x, position.y));
-                    ship.move_ship(navi.naive_navigate(ship, position))
+                    future_positions.push(*position);
+                    ship.move_ship(navi.better_navigate(ship, position, &me.ship_ids, &future_positions))
                   },
-                  None => ship.stay_still(),
+                  None => {
+                    Log::log("Stay still no best move!");
+                    ship.stay_still()
+                  },
                 }
             };
             command_queue.push(command);

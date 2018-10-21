@@ -1,4 +1,5 @@
 use hlt::direction::Direction;
+use hlt::log::Log;
 use hlt::position::Position;
 use hlt::ship::Ship;
 use hlt::ShipId;
@@ -44,6 +45,32 @@ impl Navi {
         self.occupied[position.y as usize][position.x as usize].is_none()
     }
 
+    pub fn is_smart_safe(&self, position: &Position, owner_ships: &Vec<ShipId>, future_positions: &Vec<Position>) -> bool {
+        let position = self.normalize(position);
+        let occupier = self.occupied[position.y as usize][position.x as usize];
+        match occupier {
+          Some(ship) => {
+            if owner_ships.contains(&ship) {
+              self.is_self_safe(&position, future_positions)
+            } else {
+              false
+            }
+          },
+          None => true
+        }
+    }
+
+    pub fn is_self_safe(&self, position: &Position, future_positions: &Vec<Position>) -> bool {
+        let position = self.normalize(position);
+        let is_safe_from_own_ships = !future_positions.into_iter().any(|future_position| {
+          Log::log(&format!("Future position: {}, {}", future_position.x, future_position.y));
+          Log::log(&format!("New position: {}, {}", position.x, position.y));
+          future_position.x == position.x && future_position.y == position.y
+        });
+        Log::log(&format!("Is safe from own ships: {}", is_safe_from_own_ships));
+        is_safe_from_own_ships
+    }
+
     pub fn is_unsafe(&self, position: &Position) -> bool {
         !self.is_safe(position)
     }
@@ -82,6 +109,22 @@ impl Navi {
         }
 
         possible_moves
+    }
+
+    pub fn better_navigate(&mut self, ship: &Ship, destination: &Position, owner_ships: &Vec<ShipId>, future_positions: &Vec<Position>) -> Direction {
+        let ship_position = &ship.position;
+
+        // get_unsafe_moves normalizes for us
+        for direction in self.get_unsafe_moves(&ship_position, destination) {
+            let target_pos = ship_position.directional_offset(direction);
+
+            if self.is_smart_safe(&target_pos, owner_ships, future_positions) {
+                self.mark_unsafe(&target_pos, ship.id);
+                return direction;
+            }
+        }
+
+        Direction::Still
     }
 
     pub fn naive_navigate(&mut self, ship: &Ship, destination: &Position) -> Direction {
