@@ -2,6 +2,7 @@ MyBot
 Makefile
 *.hlt
 *.log
+*.lock
 *~
 *.pyc
 *.pyo

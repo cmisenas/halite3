@@ -38,6 +38,7 @@ fn main() {
         let map = &mut game.map;
 
         let mut command_queue: Vec<Command> = Vec::new();
+        let mut current_positions: Vec<Position> = Vec::new();
         let mut future_positions: Vec<Position> = Vec::new();
 
         for ship_id in &me.ship_ids {
@@ -46,27 +47,33 @@ fn main() {
 
             Log::log(&format!("For ship in: {}, {}", ship.position.x, ship.position.y));
             let command = if ship.halite > 900 {
-                let shipyard_direction = navi.better_navigate(ship, &me.shipyard.position, &me.ship_ids, &future_positions);
+                let shipyard_direction = navi.better_navigate(ship, &me.shipyard.position, &me.ship_ids, &future_positions, &current_positions);
                 let future_position = ship.position.directional_offset(shipyard_direction);
+                current_positions.push(ship.position);
                 future_positions.push(future_position);
                 Log::log("Move towards shipyard");
                 ship.move_ship(shipyard_direction)
-            } else if cell.halite > 0  {
+            } else if cell.halite > 0 && navi.is_smart_safe(&ship.position, &ship.position, &me.ship_ids, &future_positions, &current_positions)  {
                 Log::log(&format!("Stay still: {}", cell.halite));
+                current_positions.push(ship.position);
+                future_positions.push(ship.position);
                 ship.stay_still()
             } else {
                 let mut possible_positions = ship.position.get_surrounding_cardinals();
                 possible_positions.sort_by(|position_a, position_b| map.at_position(position_b).halite.cmp(&map.at_position(position_a).halite));
-                let best_position = possible_positions.iter().find(|position| navi.is_smart_safe(position, &me.ship_ids, &future_positions));
+                let best_position = possible_positions.iter().find(|position| navi.is_smart_safe(position, &ship.position, &me.ship_ids, &future_positions, &current_positions));
                 Log::log(&format!("Number of possible_positions: {}", possible_positions.len()));
                 match best_position {
                   Some(position) => {
                     Log::log(&format!("Best position: {}, {}", position.x, position.y));
+                    current_positions.push(ship.position);
                     future_positions.push(*position);
-                    ship.move_ship(navi.better_navigate(ship, position, &me.ship_ids, &future_positions))
+                    ship.move_ship(ship.position.get_direction_to_position(position))
                   },
                   None => {
                     Log::log("Stay still no best move!");
+                    current_positions.push(ship.position);
+                    future_positions.push(ship.position);
                     ship.stay_still()
                   },
                 }

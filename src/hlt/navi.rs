@@ -45,27 +45,31 @@ impl Navi {
         self.occupied[position.y as usize][position.x as usize].is_none()
     }
 
-    pub fn is_smart_safe(&self, position: &Position, owner_ships: &Vec<ShipId>, future_positions: &Vec<Position>) -> bool {
-        let position = self.normalize(position);
-        let occupier = self.occupied[position.y as usize][position.x as usize];
+    pub fn is_smart_safe(&self, future_position: &Position, current_position: &Position, owner_ships: &Vec<ShipId>, future_positions: &Vec<Position>, current_positions: &Vec<Position>) -> bool {
+        let future_position = self.normalize(future_position);
+        let occupier = self.occupied[future_position.y as usize][future_position.x as usize];
         match occupier {
           Some(ship) => {
             if owner_ships.contains(&ship) {
-              self.is_self_safe(&position, future_positions)
+              self.is_self_safe(&future_position, &current_position, future_positions, current_positions)
             } else {
               false
             }
           },
-          None => true
+          None => {
+            self.is_self_safe(&future_position, &current_position, future_positions, current_positions)
+          }
         }
     }
 
-    pub fn is_self_safe(&self, position: &Position, future_positions: &Vec<Position>) -> bool {
-        let position = self.normalize(position);
-        let is_safe_from_own_ships = !future_positions.into_iter().any(|future_position| {
-          Log::log(&format!("Future position: {}, {}", future_position.x, future_position.y));
-          Log::log(&format!("New position: {}, {}", position.x, position.y));
-          future_position.x == position.x && future_position.y == position.y
+    pub fn is_self_safe(&self, future_position: &Position, current_position: &Position, future_positions: &Vec<Position>, current_positions: &Vec<Position>) -> bool {
+        let future_position = self.normalize(future_position);
+        let is_safe_from_own_ships = !current_positions.iter().zip(future_positions.iter()).any(|(current_other_position, future_other_position)| {
+          Log::log(&format!("Future position: {}, {}", future_other_position.x, future_other_position.y));
+          Log::log(&format!("New position: {}, {}", future_position.x, future_position.y));
+          // Check that ship won't occupy a cell that another ship will occupy in the future
+          // Check that ship's current position is not another ship's future position *and* ship's future position is not another ship's current position
+          (future_position.equal(future_other_position)) || (current_position.equal(future_other_position) && future_position.equal(current_other_position))
         });
         Log::log(&format!("Is safe from own ships: {}", is_safe_from_own_ships));
         is_safe_from_own_ships
@@ -111,14 +115,14 @@ impl Navi {
         possible_moves
     }
 
-    pub fn better_navigate(&mut self, ship: &Ship, destination: &Position, owner_ships: &Vec<ShipId>, future_positions: &Vec<Position>) -> Direction {
+    pub fn better_navigate(&mut self, ship: &Ship, destination: &Position, owner_ships: &Vec<ShipId>, future_positions: &Vec<Position>, current_positions: &Vec<Position>) -> Direction {
         let ship_position = &ship.position;
 
         // get_unsafe_moves normalizes for us
         for direction in self.get_unsafe_moves(&ship_position, destination) {
             let target_pos = ship_position.directional_offset(direction);
 
-            if self.is_smart_safe(&target_pos, owner_ships, future_positions) {
+            if self.is_smart_safe(&target_pos, &ship.position, owner_ships, future_positions, current_positions) {
                 self.mark_unsafe(&target_pos, ship.id);
                 return direction;
             }
