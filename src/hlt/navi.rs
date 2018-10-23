@@ -129,18 +129,36 @@ impl Navi {
 
     pub fn better_navigate(&mut self, ship: &Ship, destination: &Position, owner_ships: &Vec<ShipId>, future_positions: &Vec<Position>, current_positions: &Vec<Position>) -> Direction {
         let ship_position = &ship.position;
+        // You can only ever have 1 or 2 possible moves. O possible moves means you've reached your destination.
+        let possible_moves = self.get_unsafe_moves(&ship_position, destination);
 
         // get_unsafe_moves normalizes for us
-        for direction in self.get_unsafe_moves(&ship_position, destination) {
-            let target_pos = ship_position.directional_offset(direction);
+        for direction in &possible_moves  {
+            let target_pos = ship_position.directional_offset(*direction);
 
             if self.is_smart_safe(&target_pos, &ship.position, owner_ships, future_positions, current_positions) {
                 self.mark_unsafe(&target_pos, ship.id);
-                return direction;
+                return *direction;
             }
         }
 
-        Direction::Still
+        let only_possible_move = possible_moves.first();
+
+        // This means that only one possible move was returned but that is unsafe
+        match only_possible_move {
+          Some(possible_move) => {
+            match possible_move {
+              Direction::North => Direction::West,
+              Direction::South => Direction::East,
+              Direction::West => Direction::North,
+              Direction::East => Direction::South,
+              // This should never happen
+              Direction::Still => Direction::Still
+            }
+          },
+          // This should never happen
+          None => Direction::Still,
+        }
     }
 
     pub fn naive_navigate(&mut self, ship: &Ship, destination: &Position) -> Direction {
