@@ -88,6 +88,18 @@ impl Navi {
         self.mark_unsafe(&ship.position, ship.id);
     }
 
+    // Change to return positions vector instead of total safe moves
+    pub fn get_total_safe_moves(&self, source: Position) -> i8 {
+      let normalized_source = self.normalize(&source);
+      let mut safe_moves_len: i8 = 0;
+      for surrounding in normalized_source.get_surrounding_cardinals() {
+        if self.is_safe(&surrounding) {
+          safe_moves_len += 1;
+        }
+      }
+      safe_moves_len
+    }
+
     pub fn get_unsafe_moves(&self, source: &Position, destination: &Position) -> Vec<Direction> {
         let normalized_source = self.normalize(source);
         let normalized_destination = self.normalize(destination);
