@@ -40,6 +40,7 @@ fn main() {
 
         let me = &game.players[game.my_id.0];
         let map = &mut game.map;
+        let remaining_turns = (game.constants.max_turns - game.turn_number) as i32;
 
         let mut command_queue: Vec<Command> = Vec::new();
         let mut current_positions: Vec<Position> = Vec::new();
@@ -55,13 +56,15 @@ fn main() {
 
         for ship in own_ships {
             let cell = map.at_entity(ship);
+            let home_distance = map.calculate_distance(&ship.position, &me.shipyard.position) as i32;
+            let should_go_home = (remaining_turns - home_distance).abs() <= 5;
             Log::log(&format!("For ship in: {}, {}", ship.position.x, ship.position.y));
             if ship.position.equal(&me.shipyard.position) {
               home_bound_ships.insert(ship.id, false);
             }
 
-            let command = if ship.halite > 900 || home_bound_ships[&ship.id] {
-                let shipyard_direction = if map.calculate_distance(&ship.position, &me.shipyard.position) == 1 {
+            let command = if ship.halite > 900 || home_bound_ships[&ship.id] || should_go_home {
+                let shipyard_direction = if home_distance == 1 && navi.is_smart_safe(&ship.position, &me.shipyard.position, &me.ship_ids, &future_positions, &current_positions) {
                   // Ram into the jerk camping at my base
                   if ship.position.x < me.shipyard.position.x {
                     Direction::East
