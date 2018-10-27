@@ -3,11 +3,14 @@ extern crate lazy_static;
 extern crate rand;
 
 use hlt::command::Command;
+use hlt::direction::Direction;
 use hlt::game::Game;
 use hlt::log::Log;
 use hlt::navi::Navi;
 use hlt::position::Position;
 use hlt::ship::Ship;
+use hlt::ShipId;
+use std::collections::HashMap;
 use std::env;
 use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
@@ -41,19 +44,38 @@ fn main() {
         let mut command_queue: Vec<Command> = Vec::new();
         let mut current_positions: Vec<Position> = Vec::new();
         let mut future_positions: Vec<Position> = Vec::new();
+        let mut home_bound_ships: HashMap<ShipId, bool> = HashMap::new();
         let mut own_ships: Vec<&Ship> = Vec::new();
         for ship_id in &me.ship_ids {
-          own_ships.push(&game.ships[ship_id])
+          own_ships.push(&game.ships[ship_id]);
+          home_bound_ships.insert(*ship_id, false);
         }
         // Calculate moves first for ships with least amount of moves possible
         own_ships.sort_by(|ship_a, ship_b| navi.get_total_safe_moves(ship_a.position).cmp(&navi.get_total_safe_moves(ship_b.position)));
 
         for ship in own_ships {
             let cell = map.at_entity(ship);
-
             Log::log(&format!("For ship in: {}, {}", ship.position.x, ship.position.y));
-            let command = if ship.halite > 900 {
-                let shipyard_direction = navi.better_navigate(&ship, &me.shipyard.position, &me.ship_ids, &future_positions, &current_positions);
+            if ship.position.equal(&me.shipyard.position) {
+              home_bound_ships.insert(ship.id, false);
+            }
+
+            let command = if ship.halite > 900 || home_bound_ships[&ship.id] {
+                let shipyard_direction = if map.calculate_distance(&ship.position, &me.shipyard.position) == 1 {
+                  // Ram into the jerk camping at my base
+                  if ship.position.x < me.shipyard.position.x {
+                    Direction::East
+                  } else if ship.position.x > me.shipyard.position.x {
+                    Direction::West
+                  } else if ship.position.y < me.shipyard.position.y {
+                    Direction::South
+                  } else {
+                    Direction::North
+                  }
+                } else {
+                  home_bound_ships.insert(ship.id, true);
+                  navi.better_navigate(&ship, &me.shipyard.position, &me.ship_ids, &future_positions, &current_positions)
+                };
                 let future_position = ship.position.directional_offset(shipyard_direction);
                 current_positions.push(ship.position);
                 future_positions.push(future_position);

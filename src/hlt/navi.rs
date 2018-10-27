@@ -148,10 +148,20 @@ impl Navi {
         match only_possible_move {
           Some(possible_move) => {
             match possible_move {
-              Direction::North => Direction::West,
-              Direction::South => Direction::East,
-              Direction::West => Direction::North,
-              Direction::East => Direction::South,
+              Direction::North | Direction::South => {
+                if self.is_smart_safe(&ship_position.directional_offset(Direction::West), &ship.position, owner_ships, future_positions, current_positions) {
+                  Direction::West
+                } else {
+                  Direction::East
+                }
+              },
+              Direction::West | Direction::East => {
+                if self.is_smart_safe(&ship_position.directional_offset(Direction::North), &ship.position, owner_ships, future_positions, current_positions) {
+                  Direction::North
+                } else {
+                  Direction::South
+                }
+              },
               // This should never happen
               Direction::Still => Direction::Still
             }
