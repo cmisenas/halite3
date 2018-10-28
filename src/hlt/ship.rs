@@ -31,6 +31,19 @@ impl Ship {
         Command::move_ship(self.id, Direction::Still)
     }
 
+    pub fn get_home_direction(&self, home: Position) -> Direction {
+        // Ram into the jerk camping at my base!
+        if self.position.x < home.x {
+          Direction::East
+        } else if self.position.x > home.x {
+          Direction::West
+        } else if self.position.y < home.y {
+          Direction::South
+        } else {
+          Direction::North
+        }
+    }
+
     pub fn generate(input: &mut Input, player_id: PlayerId, max_halite: usize) -> Ship {
         input.read_and_parse_line();
         let id = ShipId(input.next_usize());
