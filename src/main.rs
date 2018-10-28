@@ -31,6 +31,7 @@ fn main() {
     // This is a good place to do computationally expensive start-up pre-processing.
     // As soon as you call "ready" function below, the 2 second per turn timer will start.
     Game::ready("Overlord");
+    const MIN_HALITE: usize = 9;
 
     Log::log(&format!("Successfully created bot! My Player ID is {}. Bot rng seed is {}.", game.my_id.0, rng_seed));
 
@@ -84,7 +85,7 @@ fn main() {
                 future_positions.push(future_position);
                 Log::log(&format!("Move towards shipyard: x: {}, y: {}", future_position.x, future_position.y));
                 ship.move_ship(shipyard_direction)
-            } else if cell.halite > 0 && navi.is_smart_safe(&ship.position, &ship.position, &me.ship_ids, &future_positions, &current_positions)  {
+            } else if cell.halite > MIN_HALITE && navi.is_smart_safe(&ship.position, &ship.position, &me.ship_ids, &future_positions, &current_positions)  {
                 Log::log(&format!("Stay still: {}", cell.halite));
                 current_positions.push(ship.position);
                 future_positions.push(ship.position);
