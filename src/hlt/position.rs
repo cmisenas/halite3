@@ -20,7 +20,7 @@ impl Position {
     }
 
     // TODO: Fix so that if other position is not in surrounding cardinal direction, it doesn't just return Direction::Still
-    pub fn get_direction_to_position(&self, p: &Position) -> Direction {
+    pub fn get_direction_from_position(&self, p: &Position) -> Direction {
         match (self.x - p.x, self.y - p.y) {
             (0, -1) => Direction::South,
             (0, 1)  => Direction::North,
@@ -29,6 +29,7 @@ impl Position {
             _       => Direction::Still,
         }
     }
+
     pub fn equal(&self, p: &Position) -> bool {
       self.x == p.x && self.y == p.y
     }

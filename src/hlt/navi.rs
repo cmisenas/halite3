@@ -49,8 +49,8 @@ impl Navi {
         let future_position = self.normalize(future_position);
         let occupier = self.occupied[future_position.y as usize][future_position.x as usize];
         match occupier {
-          Some(ship) => {
-            if owner_ships.contains(&ship) {
+          Some(ship_id) => {
+            if owner_ships.contains(&ship_id) {
               self.is_self_safe(&future_position, &current_position, future_positions, current_positions)
             } else {
               false
@@ -100,6 +100,17 @@ impl Navi {
       safe_moves_len
     }
 
+    pub fn get_safe_moves(&self, source: &Position) -> Vec<Direction> {
+        let normalized_source = self.normalize(source);
+        let mut safe_moves: Vec<Direction> = Vec::new();
+        for surrounding in normalized_source.get_surrounding_cardinals() {
+          if self.is_safe(&surrounding) {
+            safe_moves.push(normalized_source.get_direction_from_position(&surrounding));
+          }
+        }
+        safe_moves
+    }
+
     pub fn get_unsafe_moves(&self, source: &Position, destination: &Position) -> Vec<Direction> {
         let normalized_source = self.normalize(source);
         let normalized_destination = self.normalize(destination);
@@ -142,28 +153,22 @@ impl Navi {
             }
         }
 
-        let only_possible_move = possible_moves.first();
-
-        // This means that only one possible move was returned but that is unsafe
-        match only_possible_move {
+        // Get the first possible move and check whether to go move out of the way vertically or horizontally.
+        match possible_moves.first() {
           Some(possible_move) => {
             match possible_move {
               Direction::North | Direction::South => {
                 if self.is_smart_safe(&ship_position.directional_offset(Direction::West), &ship.position, owner_ships, future_positions, current_positions) {
                   Direction::West
-                } else if self.is_smart_safe(&ship_position.directional_offset(Direction::East), &ship.position, owner_ships, future_positions, current_positions) {
-                  Direction::East
                 } else {
-                  Direction::Still
+                  Direction::East
                 }
               },
               Direction::West | Direction::East => {
                 if self.is_smart_safe(&ship_position.directional_offset(Direction::North), &ship.position, owner_ships, future_positions, current_positions) {
                   Direction::North
-                } else if self.is_smart_safe(&ship_position.directional_offset(Direction::South), &ship.position, owner_ships, future_positions, current_positions) {
-                  Direction::South
                 } else {
-                  Direction::Still
+                  Direction::South
                 }
               },
               // This should never happen
