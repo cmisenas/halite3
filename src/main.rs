@@ -56,6 +56,7 @@ fn main() {
     let mut game = Game::new();
     let mut navi = Navi::new(game.map.width, game.map.height);
     let mut home_bound_ships: HashSet<ShipId> = HashSet::new();
+    let mut previous_positions: HashMap<ShipId, Position> = HashMap::new();
     // At this point "game" variable is populated with initial map data.
     // This is a good place to do computationally expensive start-up pre-processing.
     // As soon as you call "ready" function below, the 2 second per turn timer will start.
@@ -98,6 +99,7 @@ fn main() {
               home_bound_ships.remove(&ship.id);
             }
             current_positions.push(ship.position);
+            previous_positions.insert(ship.id, ship.position);
             let is_home_bound = home_bound_ships.contains(&ship.id);
 
 
@@ -124,7 +126,12 @@ fn main() {
                 (ship.stay_still(), ship.position)
             } else {
                 let mut possible_positions: Vec<Position> = get_nearest_best_moves(map, ship);
-                let best_position = possible_positions.iter().find(|position| navi.is_smart_safe(position, &ship.position, &me.ship_ids, &future_positions, &current_positions));
+                let best_position = possible_positions.iter().find(|position| 
+                    navi.is_smart_safe(position, &ship.position, &me.ship_ids, &future_positions, &current_positions) &&
+                    // Don't send a ship to the same cell it was before
+                    // Use a non-existent position if previous position was not set for ship
+                    !previous_positions.get(&ship.id).unwrap_or(&Position {x: -1, y: -1}).equal(position)
+                );
                 Log::log(&format!("Number of possible_positions: {}", possible_positions.len()));
                 match best_position {
                   Some(position) => {
