@@ -151,15 +151,19 @@ impl Navi {
               Direction::North | Direction::South => {
                 if self.is_smart_safe(&ship_position.directional_offset(Direction::West), &ship.position, owner_ships, future_positions, current_positions) {
                   Direction::West
-                } else {
+                } else if self.is_smart_safe(&ship_position.directional_offset(Direction::East), &ship.position, owner_ships, future_positions, current_positions) {
                   Direction::East
+                } else {
+                  Direction::Still
                 }
               },
               Direction::West | Direction::East => {
                 if self.is_smart_safe(&ship_position.directional_offset(Direction::North), &ship.position, owner_ships, future_positions, current_positions) {
                   Direction::North
-                } else {
+                } else if self.is_smart_safe(&ship_position.directional_offset(Direction::South), &ship.position, owner_ships, future_positions, current_positions) {
                   Direction::South
+                } else {
+                  Direction::Still
                 }
               },
               // This should never happen

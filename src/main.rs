@@ -42,6 +42,7 @@ fn main() {
         let me = &game.players[game.my_id.0];
         let map = &mut game.map;
         let remaining_turns = (game.constants.max_turns - game.turn_number) as i32;
+        let mut is_shipyard_empty_next_turn = true;
 
         let mut command_queue: Vec<Command> = Vec::new();
         let mut current_positions: Vec<Position> = Vec::new();
@@ -65,7 +66,8 @@ fn main() {
             }
 
             let command = if ship.halite > 900 || home_bound_ships[&ship.id] || should_go_home {
-                let shipyard_direction = if home_distance == 1 && navi.is_smart_safe(&ship.position, &me.shipyard.position, &me.ship_ids, &future_positions, &current_positions) {
+                let shipyard_direction = if home_distance == 1 && navi.is_smart_safe(&me.shipyard.position, &ship.position, &me.ship_ids, &future_positions, &current_positions) {
+                  is_shipyard_empty_next_turn = false;
                   // Ram into the jerk camping at my base
                   if ship.position.x < me.shipyard.position.x {
                     Direction::East
@@ -112,10 +114,12 @@ fn main() {
             };
             command_queue.push(command);
         }
+        Log::log(&format!("Is shipyard empty next turn? {}", is_shipyard_empty_next_turn));
 
         if
             game.turn_number <= 200 &&
             me.halite >= game.constants.ship_cost &&
+            is_shipyard_empty_next_turn &&
             navi.is_safe(&me.shipyard.position)
         {
             command_queue.push(me.shipyard.spawn());
