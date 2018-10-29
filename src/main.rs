@@ -43,7 +43,7 @@ fn get_nearest_nonempty_cell(map: &GameMap, position: &Position) -> Vec<Position
     let mut distance = 2;
     let mut nonempty_cells: Vec<Position> = Vec::new();
     loop {
-        let mut distant_positions = get_cells_with_distance(position, distance);
+        let mut distant_positions = get_cells_with_distance(map, position, distance);
         nonempty_cells = distant_positions.into_iter().filter(|pos| map.at_position(pos).halite > 0).collect();
         distance += 1;
         if nonempty_cells.len() > 0 {
@@ -53,20 +53,20 @@ fn get_nearest_nonempty_cell(map: &GameMap, position: &Position) -> Vec<Position
     nonempty_cells
 }
 
-fn get_cells_with_distance(center: &Position, distance: i32) -> Vec<Position> {
+fn get_cells_with_distance(map: &GameMap, center: &Position, distance: i32) -> Vec<Position> {
     let mut distant_cells: Vec<Position> = Vec::new();
     let max_y = distance * 2 + 1;
     for y in 0..max_y {
         if y == 0 {
-            distant_cells.push(Position{x: center.x, y: center.y - distance});
+            distant_cells.push(map.normalize(&Position{x: center.x, y: center.y - distance}));
         } else if y == max_y - 1 {
-            distant_cells.push(Position{x: center.x, y: center.y + distance});
+            distant_cells.push(map.normalize(&Position{x: center.x, y: center.y + distance}));
         } else if y <= distance {
-            distant_cells.push(Position{x: center.x - y, y: center.y - (distance - y)});
-            distant_cells.push(Position{x: center.x + y, y: center.y - (distance - y)});
+            distant_cells.push(map.normalize(&Position{x: center.x - y, y: center.y - (distance - y)}));
+            distant_cells.push(map.normalize(&Position{x: center.x + y, y: center.y - (distance - y)}));
         } else if y > distance {
-            distant_cells.push(Position{x: center.x - (distance - y), y: center.y + (distance - y)});
-            distant_cells.push(Position{x: center.x + (distance - y), y: center.y + (distance - y)});
+            distant_cells.push(map.normalize(&Position{x: center.x - (distance - y), y: center.y + (distance - y)}));
+            distant_cells.push(map.normalize(&Position{x: center.x + (distance - y), y: center.y + (distance - y)}));
         }
     }
     distant_cells
@@ -188,6 +188,18 @@ fn main() {
                     let mut nearest_best_possible_positions = better_get_near_best_moves(map, &ship.position);
                     Log::log(&format!("Number of best possible positions: {}", nearest_best_possible_positions.len()));
                     // Set destination to the first best one
+                    let destination = nearest_best_possible_positions.first();
+                    match destination {
+                      Some(dest_pos) => {
+                        let best_direction = navi.better_navigate(&ship, &dest_pos, &me.ship_ids, &future_positions, &current_positions);
+                        (ship.move_ship(best_direction), *dest_pos)
+                      },
+                      // This should never happen unless the entire map has been emptied
+                      None => {
+                        Log::log("Stay still no best move!");
+                        (ship.stay_still(), ship.position)
+                      },
+                    }
                 } else {
                     let best_position = possible_positions.iter().find(|position|
                         navi.is_smart_safe(position, &ship.position, &me.ship_ids, &future_positions, &current_positions) &&
