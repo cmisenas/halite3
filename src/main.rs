@@ -32,15 +32,55 @@ fn get_nearest_base(map: &GameMap, dropoffs: &HashMap<DropoffId, Dropoff>, me: &
     let player_dropoffs = &me.dropoff_ids;
     bases.push(me.shipyard.position);
     for dropff_id in player_dropoffs {
-      bases.push(dropoffs[&dropff_id].position);
+        bases.push(dropoffs[&dropff_id].position);
     }
     bases.sort_by(|base_a, base_b| map.calculate_distance(&ship.position, &base_a).cmp(&map.calculate_distance(&ship.position, &base_b)));
     *bases.first().unwrap_or(&me.shipyard.position)
 }
 
-fn get_nearest_best_moves(map: &GameMap, ship: &Ship) -> Vec<Position> {
-    // Starting at distance 1 from current location, get cells 
-    let mut positions: Vec<Position> = ship.position.get_surrounding_cardinals().into_iter().map(|position| map.normalize(&position)).collect();
+fn get_nearest_nonempty_cell(map: &GameMap, position: &Position) -> Vec<Position> {
+    // We can start with 2 since 4 cardinal directions can be easily checked and get_near_best_moves can be used for that
+    let mut distance = 2;
+    let mut nonempty_cells: Vec<Position> = Vec::new();
+    loop {
+        let mut distant_positions = get_cells_with_distance(position, distance);
+        nonempty_cells = distant_positions.into_iter().filter(|pos| map.at_position(pos).halite > 0).collect();
+        distance += 1;
+        if nonempty_cells.len() > 0 {
+            break;
+        }
+    }
+    nonempty_cells
+}
+
+fn get_cells_with_distance(center: &Position, distance: i32) -> Vec<Position> {
+    let mut distant_cells: Vec<Position> = Vec::new();
+    let max_y = distance * 2 + 1;
+    for y in 0..max_y {
+        if y == 0 {
+            distant_cells.push(Position{x: center.x, y: center.y - distance});
+        } else if y == max_y - 1 {
+            distant_cells.push(Position{x: center.x, y: center.y + distance});
+        } else if y <= distance {
+            distant_cells.push(Position{x: center.x - y, y: center.y - (distance - y)});
+            distant_cells.push(Position{x: center.x + y, y: center.y - (distance - y)});
+        } else if y > distance {
+            distant_cells.push(Position{x: center.x - (distance - y), y: center.y + (distance - y)});
+            distant_cells.push(Position{x: center.x + (distance - y), y: center.y + (distance - y)});
+        }
+    }
+    distant_cells
+}
+
+fn better_get_near_best_moves(map: &GameMap, position: &Position) -> Vec<Position> {
+    let mut nearest_nonempty_cell = get_nearest_nonempty_cell(map, position);
+    nearest_nonempty_cell.sort_by(|position_a, position_b| map.at_position(position_b).halite.cmp(&map.at_position(position_a).halite));
+    nearest_nonempty_cell
+}
+
+fn get_near_best_moves(map: &GameMap, position: &Position) -> Vec<Position> {
+    // Starting at distance 1 from current location, get cells
+    let mut positions: Vec<Position> = position.get_surrounding_cardinals().into_iter().map(|position| map.normalize(&position)).collect();
     positions.sort_by(|position_a, position_b| map.at_position(position_b).halite.cmp(&map.at_position(position_a).halite));
     positions
 }
@@ -57,6 +97,8 @@ fn main() {
     let mut navi = Navi::new(game.map.width, game.map.height);
     let mut home_bound_ships: HashSet<ShipId> = HashSet::new();
     let mut previous_positions: HashMap<ShipId, Position> = HashMap::new();
+    let mut top_cells_by_halite = Vec::new();
+    // let mut peaks_by_halite = Vec::new();
     // At this point "game" variable is populated with initial map data.
     // This is a good place to do computationally expensive start-up pre-processing.
     // As soon as you call "ready" function below, the 2 second per turn timer will start.
@@ -65,6 +107,21 @@ fn main() {
     const MAX_CARGO_HALITE: usize = 900;
 
     Log::log(&format!("Successfully created bot! My Player ID is {}. Bot rng seed is {}.", game.my_id.0, rng_seed));
+
+    // Maybe try collecting which cells have halite 900?
+    for y in 0..game.map.height {
+        for x in 0..game.map.width {
+            let position = Position{x: x as i32, y: y as i32};
+            let cell = game.map.at_position(&position);
+            if cell.halite > 800 {
+                top_cells_by_halite.push(position);
+            }
+        }
+    }
+
+    // Maybe try convolving and finding peaks?
+
+    Log::log(&format!("Top cells by halite: {}", top_cells_by_halite.len()));
 
     loop {
         game.update_frame();
@@ -102,7 +159,6 @@ fn main() {
             previous_positions.insert(ship.id, ship.position);
             let is_home_bound = home_bound_ships.contains(&ship.id);
 
-
             Log::log(&format!("For ship in x: {}, y: {}, can move? {}, should mine? {}, going home? {}, is full? {}", ship.position.x, ship.position.y, can_move_ship, can_keep_mining, is_home_bound, ship_is_full));
 
             let (command, future_position) = if !can_move_ship {
@@ -125,23 +181,31 @@ fn main() {
                 Log::log(&format!("STAY STILL ship in x: {}, y: {} - cargo: {}, cell: {}", ship.position.x, ship.position.y, ship.halite, cell.halite));
                 (ship.stay_still(), ship.position)
             } else {
-                let mut possible_positions: Vec<Position> = get_nearest_best_moves(map, ship);
-                let best_position = possible_positions.iter().find(|position| 
-                    navi.is_smart_safe(position, &ship.position, &me.ship_ids, &future_positions, &current_positions) &&
-                    // Don't send a ship to the same cell it was before
-                    // Use a non-existent position if previous position was not set for ship
-                    !previous_positions.get(&ship.id).unwrap_or(&Position {x: -1, y: -1}).equal(position)
-                );
-                Log::log(&format!("Number of possible_positions: {}", possible_positions.len()));
-                match best_position {
-                  Some(position) => {
-                    Log::log(&format!("Best position: {}, {}", position.x, position.y));
-                    (ship.move_ship(ship.position.get_direction_from_position(position)), *position)
-                  },
-                  None => {
-                    Log::log("Stay still no best move!");
-                    (ship.stay_still(), ship.position)
-                  },
+                let mut possible_positions: Vec<Position> = get_near_best_moves(map, &ship.position);
+                // if all possible positions are empty
+                if possible_positions.iter().all(|pos| map.at_position(pos).halite == 0) {
+                    Log::log("All immediate possible positions are empty!");
+                    let mut nearest_best_possible_positions = better_get_near_best_moves(map, &ship.position);
+                    Log::log(&format!("Number of best possible positions: {}", nearest_best_possible_positions.len()));
+                    // Set destination to the first best one
+                } else {
+                    let best_position = possible_positions.iter().find(|position|
+                        navi.is_smart_safe(position, &ship.position, &me.ship_ids, &future_positions, &current_positions) &&
+                        // Don't send a ship to the same cell it was before
+                        // Use a non-existent position if previous position was not set for ship
+                        !previous_positions.get(&ship.id).unwrap_or(&Position {x: -1, y: -1}).equal(position)
+                    );
+                    Log::log(&format!("Number of possible_positions: {}", possible_positions.len()));
+                    match best_position {
+                      Some(position) => {
+                        Log::log(&format!("Best position: {}, {}", position.x, position.y));
+                        (ship.move_ship(ship.position.get_direction_from_position(position)), *position)
+                      },
+                      None => {
+                        Log::log("Stay still no best move!");
+                        (ship.stay_still(), ship.position)
+                      },
+                    }
                 }
             };
             future_positions.push(future_position);
