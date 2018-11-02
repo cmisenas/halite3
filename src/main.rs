@@ -68,19 +68,21 @@ fn get_cells_with_distance(map: &GameMap, center: &Position, distance: i32) -> V
             distant_cells.push(map.normalize(&Position{x: center.x - y, y: center.y - (distance - y)}));
             distant_cells.push(map.normalize(&Position{x: center.x + y, y: center.y - (distance - y)}));
         } else if y > distance {
-            distant_cells.push(map.normalize(&Position{x: center.x - (distance - y), y: center.y + (distance - y)}));
-            distant_cells.push(map.normalize(&Position{x: center.x + (distance - y), y: center.y + (distance - y)}));
+            distant_cells.push(map.normalize(&Position{x: center.x - (max_y - y - 1), y: center.y + (y - distance)}));
+            distant_cells.push(map.normalize(&Position{x: center.x + (max_y - y - 1), y: center.y + (y - distance)}));
         }
     }
     distant_cells
 }
 
+// Normalized directions
 fn better_get_near_best_moves(map: &GameMap, position: &Position) -> Vec<Position> {
     let mut nearest_nonempty_cell = get_nearest_nonempty_cell(map, position);
     nearest_nonempty_cell.sort_by(|position_a, position_b| map.at_position(position_b).halite.cmp(&map.at_position(position_a).halite));
     nearest_nonempty_cell
 }
 
+// Normalized directions
 fn get_near_best_moves(map: &GameMap, position: &Position) -> Vec<Position> {
     // Starting at distance 1 from current location, get cells
     let mut positions: Vec<Position> = position.get_surrounding_cardinals().into_iter().map(|position| map.normalize(&position)).collect();
@@ -126,6 +128,10 @@ fn main() {
     // Maybe try convolving and finding peaks?
 
     Log::log(&format!("Top cells by halite: {}", top_cells_by_halite.len()));
+    let test_cells = get_cells_with_distance(&game.map, &Position{x: 8, y: 16}, 9);
+    for cell in test_cells {
+      Log::log(&format!("Cell with distance - {:?}", cell));
+    }
 
     loop {
         game.update_frame();
@@ -186,7 +192,7 @@ fn main() {
                   home_bound_ships.insert(ship.id);
                   navi.better_navigate(&ship, &nearest_base, &me.ship_ids, &future_positions, &current_positions)
                 };
-                let future_position = ship.position.directional_offset(shipyard_direction);
+                let future_position = map.normalize(&ship.position.directional_offset(shipyard_direction));
                 Log::log(&format!("Move towards shipyard: {:?}", future_position));
                 (ship.move_ship(shipyard_direction), future_position)
             } else if can_keep_mining {
@@ -204,7 +210,7 @@ fn main() {
                     match destination {
                       Some(dest_pos) => {
                         let best_direction = navi.better_navigate(&ship, &dest_pos, &me.ship_ids, &future_positions, &current_positions);
-                        let new_pos = ship.position.directional_offset(best_direction);
+                        let new_pos = map.normalize(&ship.position.directional_offset(best_direction));
                         Log::log(&format!("Destination position: {:?} | Best position: {:?}, {:?}", dest_pos, new_pos, best_direction));
                         (ship.move_ship(best_direction), new_pos)
                       },
