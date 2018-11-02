@@ -22,8 +22,11 @@ use std::time::UNIX_EPOCH;
 
 mod hlt;
 
+const MIN_CELL_HALITE: usize = 9;
+const MAX_CARGO_HALITE: usize = 900;
+
 fn can_move(map: &GameMap, ship: &Ship) -> bool {
-    (map.at_entity(ship).halite as f64 * 0.1) <= ship.halite as f64
+    (map.at_entity(ship).halite as f64 * 0.1).floor() <= ship.halite as f64
 }
 
 fn get_nearest_base(map: &GameMap, dropoffs: &HashMap<DropoffId, Dropoff>, me: &Player, ship: &Ship) -> Position {
@@ -44,7 +47,7 @@ fn get_nearest_nonempty_cell(map: &GameMap, position: &Position) -> Vec<Position
     let mut nonempty_cells: Vec<Position> = Vec::new();
     loop {
         let mut distant_positions = get_cells_with_distance(map, position, distance);
-        nonempty_cells = distant_positions.into_iter().filter(|pos| map.at_position(pos).halite > 0).collect();
+        nonempty_cells = distant_positions.into_iter().filter(|pos| map.at_position(pos).halite > MIN_CELL_HALITE).collect();
         distance += 1;
         if nonempty_cells.len() > 0 {
             break;
@@ -103,17 +106,18 @@ fn main() {
     // This is a good place to do computationally expensive start-up pre-processing.
     // As soon as you call "ready" function below, the 2 second per turn timer will start.
     Game::ready("Overlord");
-    const MIN_CELL_HALITE: usize = 0;
-    const MAX_CARGO_HALITE: usize = 900;
 
     Log::log(&format!("Successfully created bot! My Player ID is {}. Bot rng seed is {}.", game.my_id.0, rng_seed));
 
+    let end_x = game.map.width/2;
+    let end_y = if game.players.len() == 2 { game.map.height } else { game.map.height/2 };
+
     // Maybe try collecting which cells have halite 900?
-    for y in 0..game.map.height {
-        for x in 0..game.map.width {
+    for y in 0..end_y {
+        for x in 0..end_x {
             let position = Position{x: x as i32, y: y as i32};
             let cell = game.map.at_position(&position);
-            if cell.halite > 800 {
+            if cell.halite > 500 {
                 top_cells_by_halite.push(position);
             }
         }
@@ -136,11 +140,19 @@ fn main() {
         let mut current_positions: Vec<Position> = Vec::new();
         let mut future_positions: Vec<Position> = Vec::new();
         let mut own_ships: Vec<&Ship> = Vec::new();
+        let mut sortable_ships: Vec<&Ship> = Vec::new();
         for ship_id in &me.ship_ids {
-          own_ships.push(&game.ships[ship_id]);
+          let ship = &game.ships[ship_id];
+          if can_move(map, ship) {
+            sortable_ships.push(ship);
+          } else {
+            own_ships.push(ship);
+          }
         }
+        // Have high priority for ships that can't move
         // Calculate moves first for ships with least amount of moves possible
-        own_ships.sort_by(|ship_a, ship_b| navi.get_total_safe_moves(ship_a.position).cmp(&navi.get_total_safe_moves(ship_b.position)));
+        sortable_ships.sort_by(|ship_a, ship_b| navi.get_total_safe_moves(ship_a.position).cmp(&navi.get_total_safe_moves(ship_b.position)));
+        own_ships.extend(&sortable_ships);
 
         for ship in own_ships {
             let cell = map.at_entity(ship);
@@ -159,13 +171,13 @@ fn main() {
             previous_positions.insert(ship.id, ship.position);
             let is_home_bound = home_bound_ships.contains(&ship.id);
 
-            Log::log(&format!("For ship in x: {}, y: {}, can move? {}, should mine? {}, going home? {}, is full? {}", ship.position.x, ship.position.y, can_move_ship, can_keep_mining, is_home_bound, ship_is_full));
+            Log::log(&format!("For ship in {:?}, can move? {}, should mine? {}, going home? {}, is full? {}", ship.position, can_move_ship, can_keep_mining, is_home_bound, ship_is_full));
 
             let (command, future_position) = if !can_move_ship {
-                Log::log(&format!("CANNOT MOVE ship in x: {}, y: {} - cargo: {}, cell: {}", ship.position.x, ship.position.y, ship.halite, cell.halite));
+                Log::log(&format!("CANNOT MOVE ship in {:?} - cargo: {}, cell: {}", ship.position, ship.halite, cell.halite));
                 (ship.stay_still(), ship.position)
             } else if ship_is_full || is_home_bound || should_go_home {
-                Log::log(&format!("GO HOME ship in x: {}, y: {} - cargo: {}, cell: {}", ship.position.x, ship.position.y, ship.halite, cell.halite));
+                Log::log(&format!("GO HOME ship in {:?} - cargo: {}, cell: {}", ship.position, ship.halite, cell.halite));
                 let shipyard_direction = if home_distance == 1 {
                   // Ram into the jerk camping at my base!
                   is_shipyard_empty_next_turn = false;
@@ -175,15 +187,15 @@ fn main() {
                   navi.better_navigate(&ship, &nearest_base, &me.ship_ids, &future_positions, &current_positions)
                 };
                 let future_position = ship.position.directional_offset(shipyard_direction);
-                Log::log(&format!("Move towards shipyard: x: {}, y: {}", future_position.x, future_position.y));
+                Log::log(&format!("Move towards shipyard: {:?}", future_position));
                 (ship.move_ship(shipyard_direction), future_position)
             } else if can_keep_mining {
-                Log::log(&format!("STAY STILL ship in x: {}, y: {} - cargo: {}, cell: {}", ship.position.x, ship.position.y, ship.halite, cell.halite));
+                Log::log(&format!("STAY STILL ship in: {:?} - cargo: {}, cell: {}", ship.position, ship.halite, cell.halite));
                 (ship.stay_still(), ship.position)
             } else {
                 let mut possible_positions: Vec<Position> = get_near_best_moves(map, &ship.position);
                 // if all possible positions are empty
-                if possible_positions.iter().all(|pos| map.at_position(pos).halite == 0) {
+                if possible_positions.iter().all(|pos| map.at_position(pos).halite <= MIN_CELL_HALITE) {
                     Log::log("All immediate possible positions are empty!");
                     let mut nearest_best_possible_positions = better_get_near_best_moves(map, &ship.position);
                     Log::log(&format!("Number of best possible positions: {}", nearest_best_possible_positions.len()));
@@ -192,7 +204,9 @@ fn main() {
                     match destination {
                       Some(dest_pos) => {
                         let best_direction = navi.better_navigate(&ship, &dest_pos, &me.ship_ids, &future_positions, &current_positions);
-                        (ship.move_ship(best_direction), *dest_pos)
+                        let new_pos = ship.position.directional_offset(best_direction);
+                        Log::log(&format!("Destination position: {:?} | Best position: {:?}, {:?}", dest_pos, new_pos, best_direction));
+                        (ship.move_ship(best_direction), new_pos)
                       },
                       // This should never happen unless the entire map has been emptied
                       None => {
@@ -210,7 +224,7 @@ fn main() {
                     Log::log(&format!("Number of possible_positions: {}", possible_positions.len()));
                     match best_position {
                       Some(position) => {
-                        Log::log(&format!("Best position: {}, {}", position.x, position.y));
+                        Log::log(&format!("Best position: {:?}, {:?}", position, ship.position.get_direction_from_position(position)));
                         (ship.move_ship(ship.position.get_direction_from_position(position)), *position)
                       },
                       None => {

@@ -1,6 +1,6 @@
 use hlt::direction::Direction;
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Position {
     pub x: i32,
     pub y: i32,
@@ -22,10 +22,10 @@ impl Position {
     // TODO: Fix so that if other position is not in surrounding cardinal direction, it doesn't just return Direction::Still
     pub fn get_direction_from_position(&self, p: &Position) -> Direction {
         match (self.x - p.x, self.y - p.y) {
-            (0, -1) => Direction::South,
-            (0, 1)  => Direction::North,
-            (-1, 0) => Direction::East,
-            (1, 0)  => Direction::West,
+            (0, -100...-1) => Direction::South,
+            (0, 1...100)  => Direction::North,
+            (-100...-1, 0) => Direction::East,
+            (1...100, 0)  => Direction::West,
             _       => Direction::Still,
         }
     }
