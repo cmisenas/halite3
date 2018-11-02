@@ -178,7 +178,7 @@ fn main() {
                 (ship.stay_still(), ship.position)
             } else if ship_is_full || is_home_bound || should_go_home {
                 Log::log(&format!("GO HOME ship in {:?} - cargo: {}, cell: {}", ship.position, ship.halite, cell.halite));
-                let shipyard_direction = if home_distance == 1 {
+                let shipyard_direction = if home_distance == 1 && (should_go_home || is_shipyard_empty_next_turn) {
                   // Ram into the jerk camping at my base!
                   is_shipyard_empty_next_turn = false;
                   ship.get_home_direction(nearest_base)
@@ -224,8 +224,9 @@ fn main() {
                     Log::log(&format!("Number of possible_positions: {}", possible_positions.len()));
                     match best_position {
                       Some(position) => {
-                        Log::log(&format!("Best position: {:?}, {:?}", position, ship.position.get_direction_from_position(position)));
-                        (ship.move_ship(ship.position.get_direction_from_position(position)), *position)
+                        let best_direction = navi.better_navigate(&ship, &position, &me.ship_ids, &future_positions, &current_positions);
+                        Log::log(&format!("Best position: {:?}, {:?}", position, best_direction));
+                        (ship.move_ship(best_direction), *position)
                       },
                       None => {
                         Log::log("Stay still no best move!");
