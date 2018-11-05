@@ -41,15 +41,17 @@ fn get_nearest_base(map: &GameMap, dropoffs: &HashMap<DropoffId, Dropoff>, me: &
     *bases.first().unwrap_or(&me.shipyard.position)
 }
 
-fn get_nearest_nonempty_cell(map: &GameMap, position: &Position) -> Vec<Position> {
-    // We can start with 2 since 4 cardinal directions can be easily checked and get_near_best_moves can be used for that
-    let mut distance = 2;
+fn get_nearest_nonempty_cell(map: &GameMap, position: &Position, navi: &Navi, owner_ships: &Vec<ShipId>, future_positions: &Vec<Position>, current_positions: &Vec<Position>) -> Vec<Position> {
+    let mut distance = 1;
     let mut nonempty_cells: Vec<Position> = Vec::new();
     loop {
         let mut distant_positions = get_cells_with_distance(map, position, distance);
-        nonempty_cells = distant_positions.into_iter().filter(|pos| map.at_position(pos).halite > MIN_CELL_HALITE).collect();
+        nonempty_cells = distant_positions.into_iter().filter(|pos| {
+            map.at_position(pos).halite > MIN_CELL_HALITE &&
+            navi.is_smart_safe(pos, pos, owner_ships, future_positions, current_positions)
+        }).collect();
         distance += 1;
-        if nonempty_cells.len() > 0 {
+        if nonempty_cells.len() > 0 || distance > map.width / 2 {
             break;
         }
     }
@@ -76,8 +78,8 @@ fn get_cells_with_distance(map: &GameMap, center: &Position, distance: i32) -> V
 }
 
 // Normalized directions
-fn better_get_near_best_moves(map: &GameMap, position: &Position) -> Vec<Position> {
-    let mut nearest_nonempty_cell = get_nearest_nonempty_cell(map, position);
+fn better_get_near_best_moves(map: &GameMap, position: &Position, navi: &Navi, owner_ships: &Vec<ShipId>, future_positions: &Vec<Position>, current_positions: &Vec<Position>) -> Vec<Position> {
+    let mut nearest_nonempty_cell = get_nearest_nonempty_cell(map, position, navi, owner_ships, future_positions, current_positions);
     nearest_nonempty_cell.sort_by(|position_a, position_b| map.at_position(position_b).halite.cmp(&map.at_position(position_a).halite));
     nearest_nonempty_cell
 }
@@ -199,46 +201,23 @@ fn main() {
                 Log::log(&format!("STAY STILL ship in: {:?} - cargo: {}, cell: {}", ship.position, ship.halite, cell.halite));
                 (ship.stay_still(), ship.position)
             } else {
-                let mut possible_positions: Vec<Position> = get_near_best_moves(map, &ship.position);
-                // if all possible positions are empty
-                if possible_positions.iter().all(|pos| map.at_position(pos).halite <= MIN_CELL_HALITE) {
-                    Log::log("All immediate possible positions are empty!");
-                    let mut nearest_best_possible_positions = better_get_near_best_moves(map, &ship.position);
-                    Log::log(&format!("Number of best possible positions: {}", nearest_best_possible_positions.len()));
-                    // Set destination to the first best one
-                    let destination = nearest_best_possible_positions.first();
-                    match destination {
-                      Some(dest_pos) => {
-                        let best_direction = navi.better_navigate(&ship, &dest_pos, &me.ship_ids, &future_positions, &current_positions);
-                        let new_pos = map.normalize(&ship.position.directional_offset(best_direction));
-                        Log::log(&format!("Destination position: {:?} | Best position: {:?}, {:?}", dest_pos, new_pos, best_direction));
-                        (ship.move_ship(best_direction), new_pos)
-                      },
-                      // This should never happen unless the entire map has been emptied
-                      None => {
-                        Log::log("Stay still no best move!");
-                        (ship.stay_still(), ship.position)
-                      },
-                    }
-                } else {
-                    let best_position = possible_positions.iter().find(|position|
-                        navi.is_smart_safe(position, &ship.position, &me.ship_ids, &future_positions, &current_positions) &&
-                        // Don't send a ship to the same cell it was before
-                        // Use a non-existent position if previous position was not set for ship
-                        !previous_positions.get(&ship.id).unwrap_or(&Position {x: -1, y: -1}).equal(position)
-                    );
-                    Log::log(&format!("Number of possible_positions: {}", possible_positions.len()));
-                    match best_position {
-                      Some(position) => {
-                        let best_direction = navi.better_navigate(&ship, &position, &me.ship_ids, &future_positions, &current_positions);
-                        Log::log(&format!("Best position: {:?}, {:?}", position, best_direction));
-                        (ship.move_ship(best_direction), *position)
-                      },
-                      None => {
-                        Log::log("Stay still no best move!");
-                        (ship.stay_still(), ship.position)
-                      },
-                    }
+                Log::log("All immediate possible positions are empty!");
+                let mut nearest_best_possible_positions = better_get_near_best_moves(map, &ship.position, &navi, &me.ship_ids, &future_positions, &current_positions);
+                Log::log(&format!("Number of best possible positions: {}", nearest_best_possible_positions.len()));
+                // Set destination to the first best one
+                let destination = nearest_best_possible_positions.first();
+                match destination {
+                  Some(dest_pos) => {
+                    let best_direction = navi.better_navigate(&ship, &dest_pos, &me.ship_ids, &future_positions, &current_positions);
+                    let new_pos = map.normalize(&ship.position.directional_offset(best_direction));
+                    Log::log(&format!("Destination position: {:?} | Best position: {:?}, {:?}", dest_pos, new_pos, best_direction));
+                    (ship.move_ship(best_direction), new_pos)
+                  },
+                  // This should never happen unless the entire map has been emptied
+                  None => {
+                    Log::log("Stay still no best move!");
+                    (ship.stay_still(), ship.position)
+                  },
                 }
             };
             future_positions.push(future_position);

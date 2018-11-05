@@ -65,12 +65,10 @@ impl Navi {
     pub fn is_self_safe(&self, future_position: &Position, current_position: &Position, future_positions: &Vec<Position>, current_positions: &Vec<Position>) -> bool {
         let future_position = self.normalize(future_position);
         let is_safe_from_own_ships = !current_positions.iter().cloned().zip(future_positions.iter().cloned()).any(|(current_other_position, future_other_position)| {
-          Log::log(&format!("current ship's new position: {}, {} | future other ship's position: {}, {}", future_position.x, future_position.y, future_other_position.x, future_other_position.y));
           // Check that ship won't occupy a cell that another ship will occupy in the future
           // Check that ship's current position is not another ship's future position *and* ship's future position is not another ship's current position
           (future_position.equal(&future_other_position)) || (current_position.equal(&future_other_position) && future_position.equal(&current_other_position))
         });
-        Log::log(&format!("Is safe from own ships: {}", is_safe_from_own_ships));
         is_safe_from_own_ships
     }
 
