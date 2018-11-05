@@ -43,6 +43,7 @@ fn get_nearest_base(map: &GameMap, dropoffs: &HashMap<DropoffId, Dropoff>, me: &
 
 fn get_nearest_nonempty_cell(map: &GameMap, position: &Position, navi: &Navi, owner_ships: &Vec<ShipId>, future_positions: &Vec<Position>, current_positions: &Vec<Position>) -> Vec<Position> {
     let mut distance = 1;
+    let max_distance = (map.width / 2) as i32;
     let mut nonempty_cells: Vec<Position> = Vec::new();
     loop {
         let mut distant_positions = get_cells_with_distance(map, position, distance);
@@ -51,11 +52,15 @@ fn get_nearest_nonempty_cell(map: &GameMap, position: &Position, navi: &Navi, ow
             navi.is_smart_safe(pos, pos, owner_ships, future_positions, current_positions)
         }).collect();
         distance += 1;
-        if nonempty_cells.len() > 0 || distance > map.width / 2 {
+        if nonempty_cells.len() > 0 || distance > max_distance {
             break;
         }
     }
-    nonempty_cells
+    if nonempty_cells.len() == 0 {
+        position.get_surrounding_cardinals().into_iter().map(|position| map.normalize(&position)).collect()
+    } else {
+        nonempty_cells
+    }
 }
 
 fn get_cells_with_distance(map: &GameMap, center: &Position, distance: i32) -> Vec<Position> {
