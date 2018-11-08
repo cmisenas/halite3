@@ -1,14 +1,14 @@
 use hlt::command::Command;
 use hlt::constants::Constants;
 use hlt::dropoff::Dropoff;
-use hlt::DropoffId;
 use hlt::game_map::GameMap;
 use hlt::input::Input;
 use hlt::log::Log;
 use hlt::map_cell::Structure;
 use hlt::player::Player;
-use hlt::PlayerId;
 use hlt::ship::Ship;
+use hlt::DropoffId;
+use hlt::PlayerId;
 use hlt::ShipId;
 use std::collections::HashMap;
 
@@ -49,7 +49,7 @@ impl Game {
             ships: HashMap::new(),
             dropoffs: HashMap::new(),
             map,
-            input
+            input,
         }
     }
 
@@ -63,7 +63,10 @@ impl Game {
         input.read_and_parse_line();
         self.turn_number = input.next_usize();
 
-        Log::log(&format!("=============== TURN {} ================", self.turn_number));
+        Log::log(&format!(
+            "=============== TURN {} ================",
+            self.turn_number
+        ));
 
         self.ships.clear();
         self.dropoffs.clear();
@@ -82,7 +85,8 @@ impl Game {
                 &mut self.dropoffs,
                 num_ships,
                 num_dropoffs,
-                halite);
+                halite,
+            );
         }
 
         self.map.update(input);

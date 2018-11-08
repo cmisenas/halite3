@@ -2,8 +2,8 @@ use hlt::command::Command;
 use hlt::direction::Direction;
 use hlt::entity::Entity;
 use hlt::input::Input;
-use hlt::PlayerId;
 use hlt::position::Position;
+use hlt::PlayerId;
 use hlt::ShipId;
 
 pub struct Ship {
@@ -34,13 +34,13 @@ impl Ship {
     pub fn get_home_direction(&self, home: Position) -> Direction {
         // Ram into the jerk camping at my base!
         if self.position.x < home.x {
-          Direction::East
+            Direction::East
         } else if self.position.x > home.x {
-          Direction::West
+            Direction::West
         } else if self.position.y < home.y {
-          Direction::South
+            Direction::South
         } else {
-          Direction::North
+            Direction::North
         }
     }
 
@@ -51,7 +51,13 @@ impl Ship {
         let y = input.next_i32();
         let halite = input.next_usize();
 
-        Ship { owner: player_id, id, position: Position { x, y }, halite, max_halite }
+        Ship {
+            owner: player_id,
+            id,
+            position: Position { x, y },
+            halite,
+            max_halite,
+        }
     }
 }
 

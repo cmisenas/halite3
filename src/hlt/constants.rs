@@ -24,13 +24,15 @@ impl Constants {
         let tokens: Vec<&str> = token_iter.collect();
 
         if (tokens.len() % 2) != 0 {
-            Log::panic("Error: constants: expected even total number of key and value tokens from server.");
+            Log::panic(
+                "Error: constants: expected even total number of key and value tokens from server.",
+            );
         }
 
         let mut map = HashMap::new();
 
         for i in (0..tokens.len()).step_by(2) {
-            map.insert(tokens[i].to_string(), tokens[i+1].to_string());
+            map.insert(tokens[i].to_string(), tokens[i + 1].to_string());
         }
 
         Constants {
@@ -53,14 +55,20 @@ impl Constants {
         let s = Constants::get_string(map, key);
         match s.parse::<T>() {
             Ok(x) => x,
-            Err(_) => Log::panic(&format!("Error: constants: for {} got '{}' from server and failed to parse that.", key, s))
+            Err(_) => Log::panic(&format!(
+                "Error: constants: for {} got '{}' from server and failed to parse that.",
+                key, s
+            )),
         }
     }
 
     fn get_string<'a>(map: &'a HashMap<String, String>, key: &str) -> &'a String {
         match map.get(key) {
             Some(x) => x,
-            None => Log::panic(&format!("Error: constants: server did not send {} constant.", key))
+            None => Log::panic(&format!(
+                "Error: constants: server did not send {} constant.",
+                key
+            )),
         }
     }
 }

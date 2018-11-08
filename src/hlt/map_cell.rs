@@ -1,6 +1,6 @@
+use hlt::position::Position;
 use hlt::DropoffId;
 use hlt::PlayerId;
-use hlt::position::Position;
 
 pub struct MapCell {
     pub position: Position,

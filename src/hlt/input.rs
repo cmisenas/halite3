@@ -10,7 +10,10 @@ pub struct Input {
 
 impl Input {
     pub fn new() -> Input {
-        Input { tokens: Vec::new(), current_token: 0 }
+        Input {
+            tokens: Vec::new(),
+            current_token: 0,
+        }
     }
 
     pub fn read_and_return_line(&mut self) -> String {
@@ -21,7 +24,7 @@ impl Input {
                 Log::log("Input connection from server closed. Exiting...");
                 Log::flush();
                 exit(0);
-            },
+            }
         }
         buf
     }

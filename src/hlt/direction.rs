@@ -19,7 +19,12 @@ impl Direction {
     }
 
     pub fn get_all_cardinals() -> Vec<Direction> {
-        vec![Direction::North, Direction::South, Direction::East, Direction::West]
+        vec![
+            Direction::North,
+            Direction::South,
+            Direction::East,
+            Direction::West,
+        ]
     }
 
     pub fn get_char_encoding(&self) -> char {

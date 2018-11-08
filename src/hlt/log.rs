@@ -16,18 +16,28 @@ pub struct Log {
 
 impl Log {
     pub fn new() -> Log {
-        Log { log_buffer: Some(Vec::new()), file: None }
+        Log {
+            log_buffer: Some(Vec::new()),
+            file: None,
+        }
     }
 
     pub fn open(bot_id: usize) {
         let mut log = LOG.lock().unwrap();
 
         if log.file.is_some() {
-            Log::panic_inner(&mut log, &format!("Error: log: tried to open({}) but we have already opened before.", bot_id));
+            Log::panic_inner(
+                &mut log,
+                &format!(
+                    "Error: log: tried to open({}) but we have already opened before.",
+                    bot_id
+                ),
+            );
         }
 
         let filename = format!("bot-{}.log", bot_id);
-        let mut file = File::create(&filename).expect(&format!("Couldn't open file {} for logging!", &filename));
+        let mut file = File::create(&filename)
+            .expect(&format!("Couldn't open file {} for logging!", &filename));
 
         Log::dump_log_buffer(&log.log_buffer, &mut file);
 
@@ -42,15 +52,15 @@ impl Log {
             Some(file) => {
                 writeln!(file, "{}", message).unwrap();
                 return;
-            },
-            None => ()
+            }
+            None => (),
         }
 
         match &mut log.log_buffer {
             Some(log_buffer) => {
                 log_buffer.push(message.to_string());
-            },
-            None => panic!("Error: both file and log_buffer as missing.")
+            }
+            None => panic!("Error: both file and log_buffer as missing."),
         }
     }
 
@@ -58,7 +68,9 @@ impl Log {
         let mut log = LOG.lock().unwrap();
 
         match &mut log.file {
-            Some(file) => { file.flush().unwrap(); },
+            Some(file) => {
+                file.flush().unwrap();
+            }
             None => (),
         }
     }
@@ -72,13 +84,14 @@ impl Log {
         if log.file.is_none() {
             let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
             let filename = format!("bot-unknown-{}.log", timestamp.as_secs());
-            let file = File::create(&filename).expect(&format!("Couldn't open file {} for logging!", &filename));
+            let file = File::create(&filename)
+                .expect(&format!("Couldn't open file {} for logging!", &filename));
             log.file = Some(file);
         }
 
         let file = match &mut log.file {
             Some(file) => file,
-            None => panic!("Error: file should exist!")
+            None => panic!("Error: file should exist!"),
         };
 
         Log::dump_log_buffer(&log.log_buffer, file);
@@ -96,7 +109,7 @@ impl Log {
                     writeln!(file, "{}", message).unwrap();
                 }
             }
-            None => ()
+            None => (),
         }
     }
 }

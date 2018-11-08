@@ -1,9 +1,9 @@
 use hlt::direction::Direction;
+use hlt::game::Game;
 use hlt::log::Log;
 use hlt::position::Position;
 use hlt::ship::Ship;
 use hlt::ShipId;
-use hlt::game::Game;
 
 pub struct Navi {
     pub width: usize,
@@ -18,7 +18,11 @@ impl Navi {
             occupied.push(vec![None; width]);
         }
 
-        Navi { width, height, occupied }
+        Navi {
+            width,
+            height,
+            occupied,
+        }
     }
 
     pub fn update_frame(&mut self, game: &Game) {
@@ -45,27 +49,39 @@ impl Navi {
         self.occupied[position.y as usize][position.x as usize].is_none()
     }
 
-    pub fn is_smart_safe(&self, future_position: &Position, current_position: &Position, owner_ships: &Vec<ShipId>, future_positions: &Vec<Position>) -> bool {
+    pub fn is_smart_safe(
+        &self,
+        future_position: &Position,
+        current_position: &Position,
+        owner_ships: &Vec<ShipId>,
+        future_positions: &Vec<Position>,
+    ) -> bool {
         let future_position = self.normalize(future_position);
         let occupier = self.occupied[future_position.y as usize][future_position.x as usize];
         match occupier {
-          Some(ship_id) => {
-            if owner_ships.contains(&ship_id) {
-              self.is_self_safe(&future_position, &current_position, future_positions)
-            } else {
-              false
+            Some(ship_id) => {
+                if owner_ships.contains(&ship_id) {
+                    self.is_self_safe(&future_position, &current_position, future_positions)
+                } else {
+                    false
+                }
             }
-          },
-          None => {
-            self.is_self_safe(&future_position, &current_position, future_positions)
-          }
+            None => self.is_self_safe(&future_position, &current_position, future_positions),
         }
     }
 
-    pub fn is_self_safe(&self, future_position: &Position, current_position: &Position, future_positions: &Vec<Position>) -> bool {
+    pub fn is_self_safe(
+        &self,
+        future_position: &Position,
+        current_position: &Position,
+        future_positions: &Vec<Position>,
+    ) -> bool {
         let future_position = self.normalize(future_position);
         // Check that ship won't occupy a cell that another ship will occupy in the future
-        !future_positions.iter().cloned().any(|future_other_position| future_position.equal(&future_other_position))
+        !future_positions
+            .iter()
+            .cloned()
+            .any(|future_other_position| future_position.equal(&future_other_position))
     }
 
     pub fn is_unsafe(&self, position: &Position) -> bool {
@@ -83,23 +99,23 @@ impl Navi {
 
     // Change to return positions vector instead of total safe moves
     pub fn get_total_safe_moves(&self, source: Position) -> i8 {
-      let normalized_source = self.normalize(&source);
-      let mut safe_moves_len: i8 = 0;
-      for surrounding in normalized_source.get_surrounding_cardinals() {
-        if self.is_safe(&surrounding) {
-          safe_moves_len += 1;
+        let normalized_source = self.normalize(&source);
+        let mut safe_moves_len: i8 = 0;
+        for surrounding in normalized_source.get_surrounding_cardinals() {
+            if self.is_safe(&surrounding) {
+                safe_moves_len += 1;
+            }
         }
-      }
-      safe_moves_len
+        safe_moves_len
     }
 
     pub fn get_safe_moves(&self, source: &Position) -> Vec<Direction> {
         let normalized_source = self.normalize(source);
         let mut safe_moves: Vec<Direction> = Vec::new();
         for surrounding in normalized_source.get_surrounding_cardinals() {
-          if self.is_safe(&surrounding) {
-            safe_moves.push(normalized_source.get_direction_from_position(&surrounding));
-          }
+            if self.is_safe(&surrounding) {
+                safe_moves.push(normalized_source.get_direction_from_position(&surrounding));
+            }
         }
         safe_moves
     }
@@ -117,27 +133,49 @@ impl Navi {
         let mut possible_moves: Vec<Direction> = Vec::new();
 
         if normalized_source.x < normalized_destination.x {
-            possible_moves.push(if dx > wrapped_dx { Direction::West } else { Direction::East });
+            possible_moves.push(if dx > wrapped_dx {
+                Direction::West
+            } else {
+                Direction::East
+            });
         } else if normalized_source.x > normalized_destination.x {
-            possible_moves.push(if dx < wrapped_dx { Direction::West } else { Direction::East });
+            possible_moves.push(if dx < wrapped_dx {
+                Direction::West
+            } else {
+                Direction::East
+            });
         }
 
         if normalized_source.y < normalized_destination.y {
-            possible_moves.push(if dy > wrapped_dy { Direction::North } else { Direction::South });
+            possible_moves.push(if dy > wrapped_dy {
+                Direction::North
+            } else {
+                Direction::South
+            });
         } else if normalized_source.y > normalized_destination.y {
-            possible_moves.push(if dy < wrapped_dy { Direction::North } else { Direction::South });
+            possible_moves.push(if dy < wrapped_dy {
+                Direction::North
+            } else {
+                Direction::South
+            });
         }
 
         possible_moves
     }
 
-    pub fn better_navigate(&mut self, ship: &Ship, destination: &Position, owner_ships: &Vec<ShipId>, future_positions: &Vec<Position>) -> Direction {
+    pub fn better_navigate(
+        &mut self,
+        ship: &Ship,
+        destination: &Position,
+        owner_ships: &Vec<ShipId>,
+        future_positions: &Vec<Position>,
+    ) -> Direction {
         let ship_position = &ship.position;
         // You can only ever have 1 or 2 possible moves. O possible moves means you've reached your destination.
         let possible_moves = self.get_unsafe_moves(&ship_position, destination);
 
         // get_unsafe_moves normalizes for us
-        for direction in &possible_moves  {
+        for direction in &possible_moves {
             let target_pos = ship_position.directional_offset(*direction);
 
             if self.is_smart_safe(&target_pos, &ship.position, owner_ships, future_positions) {
@@ -148,28 +186,38 @@ impl Navi {
 
         // Get the first possible move and check whether to go move out of the way vertically or horizontally.
         match possible_moves.first() {
-          Some(possible_move) => {
-            match possible_move {
-              Direction::North | Direction::South => {
-                if self.is_smart_safe(&ship_position.directional_offset(Direction::West), &ship.position, owner_ships, future_positions) {
-                  Direction::West
-                } else {
-                  Direction::East
+            Some(possible_move) => {
+                match possible_move {
+                    Direction::North | Direction::South => {
+                        if self.is_smart_safe(
+                            &ship_position.directional_offset(Direction::West),
+                            &ship.position,
+                            owner_ships,
+                            future_positions,
+                        ) {
+                            Direction::West
+                        } else {
+                            Direction::East
+                        }
+                    }
+                    Direction::West | Direction::East => {
+                        if self.is_smart_safe(
+                            &ship_position.directional_offset(Direction::North),
+                            &ship.position,
+                            owner_ships,
+                            future_positions,
+                        ) {
+                            Direction::North
+                        } else {
+                            Direction::South
+                        }
+                    }
+                    // This should never happen
+                    Direction::Still => Direction::Still,
                 }
-              },
-              Direction::West | Direction::East => {
-                if self.is_smart_safe(&ship_position.directional_offset(Direction::North), &ship.position, owner_ships, future_positions) {
-                  Direction::North
-                } else {
-                  Direction::South
-                }
-              },
-              // This should never happen
-              Direction::Still => Direction::Still
             }
-          },
-          // This should never happen
-          None => Direction::Still,
+            // This should never happen
+            None => Direction::Still,
         }
     }
 

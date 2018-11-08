@@ -1,7 +1,7 @@
 use hlt::command::Command;
 use hlt::entity::Entity;
-use hlt::PlayerId;
 use hlt::position::Position;
+use hlt::PlayerId;
 
 pub struct Shipyard {
     pub owner: PlayerId,

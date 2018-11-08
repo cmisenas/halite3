@@ -16,28 +16,33 @@ impl Position {
             Direction::Still => (0, 0),
         };
 
-        Position { x: self.x + dx, y: self.y + dy }
+        Position {
+            x: self.x + dx,
+            y: self.y + dy,
+        }
     }
 
     // TODO: Fix so that if other position is not in surrounding cardinal direction, it doesn't just return Direction::Still
     pub fn get_direction_from_position(&self, p: &Position) -> Direction {
         match (self.x - p.x, self.y - p.y) {
             (0, -100...-1) => Direction::South,
-            (0, 1...100)  => Direction::North,
+            (0, 1...100) => Direction::North,
             (-100...-1, 0) => Direction::East,
-            (1...100, 0)  => Direction::West,
-            _       => Direction::Still,
+            (1...100, 0) => Direction::West,
+            _ => Direction::Still,
         }
     }
 
     pub fn equal(&self, p: &Position) -> bool {
-      self.x == p.x && self.y == p.y
+        self.x == p.x && self.y == p.y
     }
 
     pub fn get_surrounding_cardinals(&self) -> Vec<Position> {
-        vec! {
-            self.directional_offset(Direction::North), self.directional_offset(Direction::South),
-            self.directional_offset(Direction::East), self.directional_offset(Direction::West)
-        }
+        vec![
+            self.directional_offset(Direction::North),
+            self.directional_offset(Direction::South),
+            self.directional_offset(Direction::East),
+            self.directional_offset(Direction::West),
+        ]
     }
 }

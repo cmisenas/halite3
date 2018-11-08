@@ -78,14 +78,25 @@ impl GameMap {
             for x in 0..width {
                 let halite = input.next_usize();
 
-                let position = Position { x: x as i32, y: y as i32 };
-                let cell = MapCell { position, halite, structure: Structure::None };
+                let position = Position {
+                    x: x as i32,
+                    y: y as i32,
+                };
+                let cell = MapCell {
+                    position,
+                    halite,
+                    structure: Structure::None,
+                };
                 row.push(cell);
             }
 
             cells.push(row);
         }
 
-        GameMap { width, height, cells }
+        GameMap {
+            width,
+            height,
+            cells,
+        }
     }
 }
