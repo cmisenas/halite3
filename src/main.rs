@@ -97,6 +97,31 @@ fn get_near_best_moves(map: &GameMap, position: &Position) -> Vec<Position> {
     positions
 }
 
+fn get_top_map_cells(game: &Game) -> Vec<Position> {
+    let mut top_cells_by_halite = Vec::new();
+    let map_width = game.map.width;
+    let map_height = game.map.height;
+    let is_two_player = game.players.len() == 2;
+    let end_x = map_width / 2;
+    let end_y = if is_two_player { map_height } else { map_height / 2 };
+
+    for y in 0..end_y {
+        for x in 0..end_x {
+            let position = Position{x: x as i32, y: y as i32};
+            let cell = game.map.at_position(&position);
+            if cell.halite > 500 {
+                top_cells_by_halite.push(position);
+                top_cells_by_halite.push(Position{x: (map_width - x - 1) as i32, y: y as i32 });
+                if !is_two_player {
+                    top_cells_by_halite.push(Position{x: x as i32, y: (map_height - y - 1) as i32 });
+                    top_cells_by_halite.push(Position{x: (map_width - x + 1) as i32, y: (map_height - y + 1) as i32 });
+                }
+            }
+        }
+    }
+    top_cells_by_halite
+}
+
 fn main() {
     let args: Vec<String> = env::args().collect();
     let rng_seed: u64 = if args.len() > 1 {
@@ -109,7 +134,7 @@ fn main() {
     let mut navi = Navi::new(game.map.width, game.map.height);
     let mut home_bound_ships: HashSet<ShipId> = HashSet::new();
     let mut previous_positions: HashMap<ShipId, Position> = HashMap::new();
-    let mut top_cells_by_halite = Vec::new();
+    let top_cells_by_halite = get_top_map_cells(&game);
     // let mut peaks_by_halite = Vec::new();
     // At this point "game" variable is populated with initial map data.
     // This is a good place to do computationally expensive start-up pre-processing.
@@ -118,26 +143,9 @@ fn main() {
 
     Log::log(&format!("Successfully created bot! My Player ID is {}. Bot rng seed is {}.", game.my_id.0, rng_seed));
 
-    let end_x = game.map.width/2;
-    let end_y = if game.players.len() == 2 { game.map.height } else { game.map.height/2 };
-
-    // Maybe try collecting which cells have halite 900?
-    for y in 0..end_y {
-        for x in 0..end_x {
-            let position = Position{x: x as i32, y: y as i32};
-            let cell = game.map.at_position(&position);
-            if cell.halite > 500 {
-                top_cells_by_halite.push(position);
-            }
-        }
-    }
-
-    // Maybe try convolving and finding peaks?
-
     Log::log(&format!("Top cells by halite: {}", top_cells_by_halite.len()));
-    let test_cells = get_cells_with_distance(&game.map, &Position{x: 8, y: 16}, 9);
-    for cell in test_cells {
-      Log::log(&format!("Cell with distance - {:?}", cell));
+    for cell in top_cells_by_halite {
+      Log::log(&format!("Top cell - {:?} halite: {:?}", cell, game.map.at_position(&cell).halite));
     }
 
     loop {
