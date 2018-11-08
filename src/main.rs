@@ -218,6 +218,7 @@ fn main() {
     let mut game = Game::new();
     let mut navi = Navi::new(game.map.width, game.map.height);
     let mut home_bound_ships: HashSet<ShipId> = HashSet::new();
+    let mut just_moved_optimized: HashSet<ShipId> = HashSet::new();
     let mut previous_positions: HashMap<ShipId, Position> = HashMap::new();
     let top_cells_by_halite = get_top_map_cells(&game);
     // let mut peaks_by_halite = Vec::new();
@@ -323,11 +324,46 @@ fn main() {
                 Log::log(&format!("Move towards shipyard: {:?}", future_position));
                 (ship.move_ship(shipyard_direction), future_position)
             } else if can_keep_mining {
-                Log::log(&format!(
-                    "STAY STILL ship in: {:?} - cargo: {}, cell: {}",
-                    ship.position, ship.halite, cell.halite
-                ));
-                (ship.stay_still(), ship.position)
+                if just_moved_optimized.contains(&ship.id) {
+                    just_moved_optimized.remove(&ship.id);
+                    Log::log(&format!(
+                        "STAY STILL ship in: {:?} - cargo: {}, cell: {}",
+                        ship.position, ship.halite, cell.halite
+                    ));
+                    (ship.stay_still(), ship.position)
+                } else {
+                    // Check out all adjacent cells If one of them will yield more halite in the
+                    // next 2 turns (incl the move), go there. Otherwise, stay at current cell.
+                    let current_position_yield = calculate_halite_harvest(map, &ship.position, 2);
+                    let higher_yields = ship
+                        .position
+                        .get_surrounding_cardinals()
+                        .into_iter()
+                        .filter(|pos| {
+                            (calculate_halite_harvest(map, pos, 1) - current_position_yield) > 100
+                        }).collect::<Vec<_>>();
+                    match higher_yields.first() {
+                        Some(better_pos) => {
+                            Log::log(&format!(
+                                "Move towards better yield at {:?} with {} vs {:?} with {}",
+                                better_pos,
+                                calculate_halite_harvest(map, better_pos, 1),
+                                ship.position,
+                                current_position_yield
+                            ));
+                            let better_dir = ship.position.get_direction_from_position(better_pos);
+                            just_moved_optimized.insert(ship.id);
+                            (ship.move_ship(better_dir), *better_pos)
+                        }
+                        None => {
+                            Log::log(&format!(
+                                "STAY STILL ship in: {:?} - cargo: {}, cell: {}",
+                                ship.position, ship.halite, cell.halite
+                            ));
+                            (ship.stay_still(), ship.position)
+                        }
+                    }
+                }
             } else {
                 Log::log("All immediate possible positions are empty!");
                 let mut nearest_best_possible_positions = better_get_near_best_moves(
