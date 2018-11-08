@@ -29,6 +29,16 @@ fn can_move(map: &GameMap, ship: &Ship) -> bool {
     (map.at_entity(ship).halite as f64 * 0.1).floor() <= ship.halite as f64
 }
 
+fn calculate_halite_harvest(map: &GameMap, position: &Position, turns: i32) -> i32 {
+    let mut halite_at_cell = map.at_position(position).halite as i32;
+    let mut harvest = 0;
+    for _ in 0..turns {
+        harvest += (halite_at_cell as f64 * 0.25).ceil() as i32;
+        halite_at_cell = halite_at_cell - harvest;
+    }
+    harvest
+}
+
 fn get_nearest_base(map: &GameMap, dropoffs: &HashMap<DropoffId, Dropoff>, me: &Player, ship: &Ship) -> Position {
     // Get the shipyard position and all the dropoff positions in a vec
     let mut bases: Vec<Position> = Vec::new();
@@ -41,7 +51,7 @@ fn get_nearest_base(map: &GameMap, dropoffs: &HashMap<DropoffId, Dropoff>, me: &
     *bases.first().unwrap_or(&me.shipyard.position)
 }
 
-fn get_nearest_nonempty_cell(map: &GameMap, position: &Position, navi: &Navi, owner_ships: &Vec<ShipId>, future_positions: &Vec<Position>, current_positions: &Vec<Position>) -> Vec<Position> {
+fn get_nearest_nonempty_cell(map: &GameMap, position: &Position, navi: &Navi, owner_ships: &Vec<ShipId>, future_positions: &Vec<Position>) -> Vec<Position> {
     let mut distance = 1;
     let max_distance = (map.width / 2) as i32;
     let mut nonempty_cells: Vec<Position> = Vec::new();
@@ -49,7 +59,7 @@ fn get_nearest_nonempty_cell(map: &GameMap, position: &Position, navi: &Navi, ow
         let mut distant_positions = get_cells_with_distance(map, position, distance);
         nonempty_cells = distant_positions.into_iter().filter(|pos| {
             map.at_position(pos).halite > MIN_CELL_HALITE &&
-            navi.is_smart_safe(pos, pos, owner_ships, future_positions, current_positions)
+            navi.is_smart_safe(pos, pos, owner_ships, future_positions)
         }).collect();
         distance += 1;
         if nonempty_cells.len() > 0 || distance > max_distance {
@@ -83,8 +93,8 @@ fn get_cells_with_distance(map: &GameMap, center: &Position, distance: i32) -> V
 }
 
 // Normalized directions
-fn better_get_near_best_moves(map: &GameMap, position: &Position, navi: &Navi, owner_ships: &Vec<ShipId>, future_positions: &Vec<Position>, current_positions: &Vec<Position>) -> Vec<Position> {
-    let mut nearest_nonempty_cell = get_nearest_nonempty_cell(map, position, navi, owner_ships, future_positions, current_positions);
+fn better_get_near_best_moves(map: &GameMap, position: &Position, navi: &Navi, owner_ships: &Vec<ShipId>, future_positions: &Vec<Position>) -> Vec<Position> {
+    let mut nearest_nonempty_cell = get_nearest_nonempty_cell(map, position, navi, owner_ships, future_positions);
     nearest_nonempty_cell.sort_by(|position_a, position_b| map.at_position(position_b).halite.cmp(&map.at_position(position_a).halite));
     nearest_nonempty_cell
 }
@@ -158,7 +168,6 @@ fn main() {
         let remaining_turns = (game.constants.max_turns - game.turn_number) as i32;
         let mut is_shipyard_empty_next_turn = true;
         let mut command_queue: Vec<Command> = Vec::new();
-        let mut current_positions: Vec<Position> = Vec::new();
         let mut future_positions: Vec<Position> = Vec::new();
         let mut own_ships: Vec<&Ship> = Vec::new();
         let mut sortable_ships: Vec<&Ship> = Vec::new();
@@ -183,12 +192,11 @@ fn main() {
             let ship_is_full = ship.halite > MAX_CARGO_HALITE;
             let should_go_home = (remaining_turns - home_distance).abs() <= 5;
             let can_move_ship = can_move(map, ship);
-            let can_keep_mining = cell.halite > MIN_CELL_HALITE && navi.is_smart_safe(&ship.position, &ship.position, &me.ship_ids, &future_positions, &current_positions);
+            let can_keep_mining = cell.halite > MIN_CELL_HALITE && navi.is_smart_safe(&ship.position, &ship.position, &me.ship_ids, &future_positions);
 
             if ship_at_base {
               home_bound_ships.remove(&ship.id);
             }
-            current_positions.push(ship.position);
             previous_positions.insert(ship.id, ship.position);
             let is_home_bound = home_bound_ships.contains(&ship.id);
 
@@ -205,7 +213,7 @@ fn main() {
                   ship.get_home_direction(nearest_base)
                 } else {
                   home_bound_ships.insert(ship.id);
-                  navi.better_navigate(&ship, &nearest_base, &me.ship_ids, &future_positions, &current_positions)
+                  navi.better_navigate(&ship, &nearest_base, &me.ship_ids, &future_positions)
                 };
                 let future_position = map.normalize(&ship.position.directional_offset(shipyard_direction));
                 Log::log(&format!("Move towards shipyard: {:?}", future_position));
@@ -215,13 +223,13 @@ fn main() {
                 (ship.stay_still(), ship.position)
             } else {
                 Log::log("All immediate possible positions are empty!");
-                let mut nearest_best_possible_positions = better_get_near_best_moves(map, &ship.position, &navi, &me.ship_ids, &future_positions, &current_positions);
+                let mut nearest_best_possible_positions = better_get_near_best_moves(map, &ship.position, &navi, &me.ship_ids, &future_positions);
                 Log::log(&format!("Number of best possible positions: {}", nearest_best_possible_positions.len()));
                 // Set destination to the first best one
                 let destination = nearest_best_possible_positions.first();
                 match destination {
                   Some(dest_pos) => {
-                    let best_direction = navi.better_navigate(&ship, &dest_pos, &me.ship_ids, &future_positions, &current_positions);
+                    let best_direction = navi.better_navigate(&ship, &dest_pos, &me.ship_ids, &future_positions);
                     let new_pos = map.normalize(&ship.position.directional_offset(best_direction));
                     Log::log(&format!("Destination position: {:?} | Best position: {:?}, {:?}", dest_pos, new_pos, best_direction));
                     (ship.move_ship(best_direction), new_pos)
@@ -236,7 +244,6 @@ fn main() {
             future_positions.push(future_position);
             command_queue.push(command);
         }
-        Log::log(&format!("Is shipyard empty next turn? {}", is_shipyard_empty_next_turn));
 
         if
             game.turn_number <= 250 &&
@@ -244,10 +251,11 @@ fn main() {
             is_shipyard_empty_next_turn &&
             navi.is_safe(&me.shipyard.position)
         {
+            is_shipyard_empty_next_turn = false;
             command_queue.push(me.shipyard.spawn());
         }
 
-
+        Log::log(&format!("Is shipyard empty next turn? {}", is_shipyard_empty_next_turn));
         Game::end_turn(&command_queue);
     }
 }
