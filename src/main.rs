@@ -24,6 +24,14 @@ mod hlt;
 const MIN_CELL_HALITE: usize = 9;
 const MAX_CARGO_HALITE: usize = 900;
 
+fn get_max_cargo(game_turn: i32) -> usize {
+    if game_turn <= 150 {
+        700
+    } else {
+        MAX_CARGO_HALITE
+    }
+}
+
 fn can_move(map: &GameMap, ship: &Ship) -> bool {
     (map.at_entity(ship).halite as f64 * 0.1).floor() <= ship.halite as f64
 }
@@ -220,6 +228,7 @@ fn main() {
     let mut home_bound_ships: HashSet<ShipId> = HashSet::new();
     let mut previous_positions: HashMap<ShipId, Position> = HashMap::new();
     let top_cells_by_halite = get_top_map_cells(&game);
+    let mid_game_turn = game.constants.max_turns / 2;
     // let mut peaks_by_halite = Vec::new();
     // At this point "game" variable is populated with initial map data.
     // This is a good place to do computationally expensive start-up pre-processing.
@@ -277,7 +286,7 @@ fn main() {
             let nearest_base = get_nearest_base(map, dropoffs, me, ship);
             let home_distance = map.calculate_distance(&ship.position, &nearest_base) as i32;
             let ship_at_base = ship.position.equal(&nearest_base);
-            let ship_is_full = ship.halite > MAX_CARGO_HALITE;
+            let ship_is_full = ship.halite > get_max_cargo(game.turn_number as i32);
             let should_go_home = (remaining_turns - home_distance).abs() <= 5;
             let can_move_ship = can_move(map, ship);
             let can_keep_mining = cell.halite > MIN_CELL_HALITE && navi.is_smart_safe(
@@ -366,7 +375,7 @@ fn main() {
             command_queue.push(command);
         }
 
-        if game.turn_number <= 250
+        if game.turn_number <= mid_game_turn
             && me.halite >= game.constants.ship_cost
             && is_shipyard_empty_next_turn
             && navi.is_safe(&me.shipyard.position)
