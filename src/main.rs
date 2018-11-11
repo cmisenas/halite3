@@ -24,8 +24,18 @@ mod hlt;
 const MIN_CELL_HALITE: usize = 9;
 const MAX_CARGO_HALITE: usize = 900;
 
+fn get_min_cell_halite(game_turn: i32) -> usize {
+    if game_turn <= 100 {
+        99
+    } else if game_turn <= 250 {
+        49
+    } else {
+        MIN_CELL_HALITE
+    }
+}
+
 fn get_max_cargo(game_turn: i32) -> usize {
-    if game_turn <= 150 {
+    if game_turn <= 100 {
         700
     } else {
         MAX_CARGO_HALITE
@@ -68,6 +78,7 @@ fn get_nearest_base(
 
 fn get_nearest_nonempty_cell(
     map: &GameMap,
+    turn_number: i32,
     position: &Position,
     navi: &Navi,
     owner_ships: &Vec<ShipId>,
@@ -81,7 +92,7 @@ fn get_nearest_nonempty_cell(
         nonempty_cells = distant_positions
             .into_iter()
             .filter(|pos| {
-                map.at_position(pos).halite > MIN_CELL_HALITE
+                map.at_position(pos).halite > get_min_cell_halite(turn_number)
                     && navi.is_smart_safe(pos, pos, owner_ships, future_positions)
             }).collect();
         distance += 1;
@@ -138,15 +149,22 @@ fn get_cells_with_distance(map: &GameMap, center: &Position, distance: i32) -> V
 }
 
 // Normalized directions
-fn better_get_near_best_moves(
+fn get_near_best_moves(
     map: &GameMap,
+    turn_number: i32,
     position: &Position,
     navi: &Navi,
     owner_ships: &Vec<ShipId>,
     future_positions: &Vec<Position>,
 ) -> Vec<Position> {
-    let mut nearest_nonempty_cell =
-        get_nearest_nonempty_cell(map, position, navi, owner_ships, future_positions);
+    let mut nearest_nonempty_cell = get_nearest_nonempty_cell(
+        map,
+        turn_number,
+        position,
+        navi,
+        owner_ships,
+        future_positions,
+    );
     nearest_nonempty_cell.sort_by(|position_a, position_b| {
         map.at_position(position_b)
             .halite
@@ -156,7 +174,7 @@ fn better_get_near_best_moves(
 }
 
 // Normalized directions
-fn get_near_best_moves(map: &GameMap, position: &Position) -> Vec<Position> {
+fn get_adjacent_best_moves(map: &GameMap, position: &Position) -> Vec<Position> {
     // Starting at distance 1 from current location, get cells
     let mut positions: Vec<Position> = position
         .get_surrounding_cardinals()
@@ -289,12 +307,13 @@ fn main() {
             let ship_is_full = ship.halite > get_max_cargo(game.turn_number as i32);
             let should_go_home = (remaining_turns - home_distance).abs() <= 5;
             let can_move_ship = can_move(map, ship);
-            let can_keep_mining = cell.halite > MIN_CELL_HALITE && navi.is_smart_safe(
-                &ship.position,
-                &ship.position,
-                &me.ship_ids,
-                &future_positions,
-            );
+            let can_keep_mining = cell.halite > get_min_cell_halite(game.turn_number as i32)
+                && navi.is_smart_safe(
+                    &ship.position,
+                    &ship.position,
+                    &me.ship_ids,
+                    &future_positions,
+                );
 
             if ship_at_base {
                 home_bound_ships.remove(&ship.id);
@@ -339,8 +358,9 @@ fn main() {
                 (ship.stay_still(), ship.position)
             } else {
                 Log::log("All immediate possible positions are empty!");
-                let mut nearest_best_possible_positions = better_get_near_best_moves(
+                let mut nearest_best_possible_positions = get_near_best_moves(
                     map,
+                    game.turn_number as i32,
                     &ship.position,
                     &navi,
                     &me.ship_ids,
