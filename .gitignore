@@ -10,4 +10,4 @@ __pycache__/
 *.class
 *.ipr
 *.iws
-target/debug/
+target/
